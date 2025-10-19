@@ -1,0 +1,3 @@
+# Run every minute in Asia/Taipei timezone
+# Ensure PATH includes Playwright chromium dependencies and virtualenv
+* * * * * cd /opt/alpha-reminder && /opt/alpha-reminder/.venv/bin/python -m collector.alpha_watch >> /var/log/alpha-reminder.log 2>&1

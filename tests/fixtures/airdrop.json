@@ -1,0 +1,22 @@
+{
+  "today": [
+    {
+      "token": "ALPHA",
+      "start_time": "2024-05-26 14:00",
+      "amount": "5000 ALPHA",
+      "exchange": "Alpha123"
+    }
+  ],
+  "upcoming": [
+    {
+      "name": "BETA",
+      "time": "16:30",
+      "reward": "Whitelist access"
+    },
+    {
+      "project": "GAMMA",
+      "time": "TBA",
+      "notes": "Liquidity mining phase"
+    }
+  ]
+}

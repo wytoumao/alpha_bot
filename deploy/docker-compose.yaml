@@ -1,0 +1,33 @@
+version: "3.9"
+
+services:
+  alpha-reminder:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    environment:
+      - ALPHA_URL=${ALPHA_URL}
+      - LANGUAGE=${LANGUAGE}
+      - TIMEZONE=${TIMEZONE}
+      - AHEAD_MINUTES=${AHEAD_MINUTES}
+      - REMINDER_OFFSETS=${REMINDER_OFFSETS}
+      - QUIET_HOURS=${QUIET_HOURS}
+      - SPUG_BASE_URL=${SPUG_BASE_URL}
+      - SPUG_TOKEN=${SPUG_TOKEN}
+      - SPUG_XSEND_USER_ID=${SPUG_XSEND_USER_ID}
+      - SPUG_CHANNEL=${SPUG_CHANNEL}
+      - SPUG_TEMPLATE_ID=${SPUG_TEMPLATE_ID}
+      - SPUG_TARGETS=${SPUG_TARGETS}
+      - SPUG_TIMEOUT_SECONDS=${SPUG_TIMEOUT_SECONDS}
+      - SPUG_QUIET_CHANNEL=${SPUG_QUIET_CHANNEL}
+      - STATE_FILE=/data/alpha-state.json
+      - STATE_TTL_HOURS=${STATE_TTL_HOURS}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - NOTIFY_TBA_ONCE=${NOTIFY_TBA_ONCE}
+    volumes:
+      - alpha-reminder-state:/data
+    restart: unless-stopped
+    command: ["python", "-m", "collector.alpha_watch"]
+
+volumes:
+  alpha-reminder-state:
