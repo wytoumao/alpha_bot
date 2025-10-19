@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import datetime
 from typing import Any, Dict, List
 
 from alpha_logging import get_logger
@@ -10,6 +11,9 @@ from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt,
 
 from .models import Event
 from .parser import parse_html_document, parse_json_payloads
+from zoneinfo import ZoneInfo
+
+TOOL_SUBSTRINGS = ("工具", "通知", "看板", "提示", "帮助", "目标", "模拟", "推特")
 
 
 class AlphaCollector:
@@ -19,16 +23,19 @@ class AlphaCollector:
         locale: str = "en",
         wait_selector: str | None = None,
         extra_wait_ms: int = 1000,
+        timezone: str = "Asia/Taipei",
     ):
         self.url = url
         self.locale = locale
         self.wait_selector = wait_selector
         self.extra_wait_ms = extra_wait_ms
+        self.timezone = timezone
         self.logger = get_logger(__name__, url=url)
 
     async def fetch_events(self) -> List[Event]:
         json_payloads: List[Dict[str, Any]] = []
         html_content = ""
+        now = datetime.now(ZoneInfo(self.timezone))
 
         self.logger.info("collector.fetch.start")
 
@@ -69,13 +76,14 @@ class AlphaCollector:
         if html_content:
             events.extend(parse_html_document(html_content))
         deduped = self._deduplicate(events)
+        enriched = self._enrich_and_filter(deduped, now)
         self.logger.info(
             "collector.fetch.complete",
             raw_events=len(events),
             json_payloads=len(json_payloads),
-            events=len(deduped),
+            events=len(enriched),
         )
-        return deduped
+        return enriched
 
     async def _track_response(self, response: Response, sink: List[Dict[str, Any]]) -> None:
         try:
@@ -104,3 +112,51 @@ class AlphaCollector:
             if key not in unique or unique[key].source == "dom":
                 unique[key] = event
         return list(unique.values())
+
+    def _enrich_and_filter(self, events: List[Event], now: datetime) -> List[Event]:
+        today_str = now.strftime("%Y-%m-%d")
+        filtered: List[Event] = []
+        tool_drops = 0
+        non_today_drops = 0
+
+        for event in events:
+            if isinstance(event.details, dict):
+                date_value = event.details.get("date") or event.details.get("Date")
+                if date_value:
+                    date_str = str(date_value).strip()
+                    if date_str:
+                        event.details["date"] = date_str
+                        event.section = "today" if date_str == today_str else "upcoming"
+
+            if self._is_tool_card(event):
+                self.logger.debug("collector.filter.tool_card", token=event.token)
+                tool_drops += 1
+                continue
+
+            if event.section != "today":
+                non_today_drops += 1
+                continue
+
+            filtered.append(event)
+
+        self.logger.info(
+            "collector.filter.summary",
+            today=today_str,
+            kept=len(filtered),
+            tool_drops=tool_drops,
+            non_today_drops=non_today_drops,
+        )
+        return filtered
+
+    def _is_tool_card(self, event: Event) -> bool:
+        token = event.token or ""
+        if any(keyword in token for keyword in TOOL_SUBSTRINGS):
+            return True
+        details = event.details or {}
+        if isinstance(details, dict):
+            if any(key in details for key in ("tool", "工具")):
+                return True
+            lines = details.get("lines")
+            if isinstance(lines, list) and any(isinstance(item, str) and any(keyword in item for keyword in TOOL_SUBSTRINGS) for item in lines):
+                return True
+        return False

@@ -16,7 +16,11 @@ from .timeutil import now_in_timezone, parse_event_time, in_quiet_hours
 
 async def run_once(settings: Settings, notifier: SpugNotifier, state: StateStore) -> None:
     logger = get_logger("alpha.watch")
-    collector = AlphaCollector(settings.alpha_url, locale=settings.language)
+    collector = AlphaCollector(
+        settings.alpha_url,
+        locale=settings.language,
+        timezone=settings.timezone,
+    )
     now = now_in_timezone(settings.timezone)
 
     try:
