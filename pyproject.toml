@@ -33,4 +33,4 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 packages = ["collector", "config", "notifier"]
-py_modules = ["alpha_logging"]
+py-modules = ["alpha_logging"]
