@@ -4,11 +4,11 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV_PATH="${PROJECT_ROOT}/.venv"
 
-python3 -m venv "${VENV_PATH}"
+python -m venv "${VENV_PATH}"
 source "${VENV_PATH}/bin/activate"
 
-pip install --upgrade pip
-pip install -e "${PROJECT_ROOT}"
+python -m pip install --upgrade pip
+python -m pip install -e "${PROJECT_ROOT}"
 
 "${VENV_PATH}/bin/playwright" install chromium
 

@@ -30,3 +30,7 @@ testpaths = ["tests"]
 [build-system]
 requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["collector", "config", "notifier"]
+py_modules = ["alpha_logging"]

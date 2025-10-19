@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Iterable, List, Optional, Sequence, Tuple
+from typing import Iterable, List, Optional, Sequence
 
-import structlog
+from alpha_logging import get_logger
 
 from .models import Event
 from .state import StateStore
@@ -31,16 +31,23 @@ class ReminderEngine:
         self.ahead_minutes = ahead_minutes
         self.reminder_offsets = sorted(reminder_offsets, reverse=True)
         self.notify_tba_once = notify_tba_once
-        self.logger = structlog.get_logger(__name__)
+        self.logger = get_logger(__name__)
 
     def evaluate(self, events: Iterable[Event], now: datetime) -> List[Reminder]:
         reminders: List[Reminder] = []
         for event in events:
             if event.start_time and is_within_window(event.start_time, now, self.ahead_minutes):
+                self.logger.info(
+                    "reminder.event_in_window",
+                    token=event.token,
+                    start=str(event.start_time),
+                    ahead=self.ahead_minutes,
+                )
                 reminders.extend(self._evaluate_timed_event(event, now))
             elif not event.start_time and self.notify_tba_once:
                 key = event.without_time_key()
                 if not self.state_store.was_notified(key):
+                    self.logger.info("reminder.tba_ready", token=event.token, section=event.section)
                     reminders.append(
                         Reminder(
                             event=event,
@@ -60,6 +67,12 @@ class ReminderEngine:
                 continue
             trigger_time = event.start_time - timedelta(minutes=offset)
             if trigger_time <= now <= event.start_time:
+                self.logger.info(
+                    "reminder.offset_ready",
+                    token=event.token,
+                    offset=offset,
+                    start=str(event.start_time),
+                )
                 ready.append(
                     Reminder(
                         event=event,

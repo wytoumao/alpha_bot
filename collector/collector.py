@@ -4,8 +4,8 @@ import asyncio
 import json
 from typing import Any, Dict, List
 
-import structlog
-from playwright.async_api import Browser, Page, Response, TimeoutError, async_playwright
+from alpha_logging import get_logger
+from playwright.async_api import Response, TimeoutError, async_playwright
 from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from .models import Event
@@ -24,11 +24,13 @@ class AlphaCollector:
         self.locale = locale
         self.wait_selector = wait_selector
         self.extra_wait_ms = extra_wait_ms
-        self.logger = structlog.get_logger(__name__)
+        self.logger = get_logger(__name__, url=url)
 
     async def fetch_events(self) -> List[Event]:
         json_payloads: List[Dict[str, Any]] = []
         html_content = ""
+
+        self.logger.info("collector.fetch.start")
 
         async def runner() -> None:
             nonlocal json_payloads, html_content
@@ -36,8 +38,10 @@ class AlphaCollector:
                 browser = await playwright.chromium.launch(headless=True)
                 try:
                     page = await browser.new_page()
+                    self.logger.info("collector.browser.ready")
                     page.on("response", lambda r: asyncio.create_task(self._track_response(r, json_payloads)))
                     await page.goto(self.url, wait_until="networkidle")
+                    self.logger.info("collector.page.loaded")
                     if self.wait_selector:
                         try:
                             await page.wait_for_selector(self.wait_selector, timeout=8000)
@@ -64,7 +68,14 @@ class AlphaCollector:
             events.extend(parse_json_payloads(json_payloads))
         if html_content:
             events.extend(parse_html_document(html_content))
-        return self._deduplicate(events)
+        deduped = self._deduplicate(events)
+        self.logger.info(
+            "collector.fetch.complete",
+            raw_events=len(events),
+            json_payloads=len(json_payloads),
+            events=len(deduped),
+        )
+        return deduped
 
     async def _track_response(self, response: Response, sink: List[Dict[str, Any]]) -> None:
         try:
@@ -82,6 +93,7 @@ class AlphaCollector:
                 sink.append(payload)
             elif isinstance(payload, list):
                 sink.append({"payload": payload})
+            self.logger.info("collector.api.captured", url=response.url)
         except Exception as exc:  # best-effort logging only
             self.logger.debug("collector.response_parse_failed", url=response.url, error=str(exc))
 

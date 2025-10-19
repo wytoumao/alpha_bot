@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 from datetime import timedelta
 
-import structlog
+from alpha_logging import configure as configure_global_logging, get_logger
 
 from config.settings import Settings, load_settings
 from notifier.spug import SpugConfig, SpugNotifier, SpugError
@@ -15,24 +14,8 @@ from .state import StateStore
 from .timeutil import now_in_timezone, parse_event_time, in_quiet_hours
 
 
-def configure_logging(level: str) -> None:
-    logging.basicConfig(
-        level=getattr(logging, level.upper(), logging.INFO),
-        format="%(asctime)s %(levelname)s %(name)s %(message)s",
-    )
-    structlog.configure(
-        processors=[
-            structlog.processors.add_log_level,
-            structlog.processors.TimeStamper(fmt="iso"),
-            structlog.processors.JSONRenderer(),
-        ],
-        logger_factory=structlog.stdlib.LoggerFactory(),
-        wrapper_class=structlog.stdlib.BoundLogger,
-    )
-
-
 async def run_once(settings: Settings, notifier: SpugNotifier, state: StateStore) -> None:
-    logger = structlog.get_logger("alpha.watch")
+    logger = get_logger("alpha.watch")
     collector = AlphaCollector(settings.alpha_url, locale=settings.language)
     now = now_in_timezone(settings.timezone)
 
@@ -72,8 +55,8 @@ async def run_once(settings: Settings, notifier: SpugNotifier, state: StateStore
 
 async def main() -> None:
     settings = load_settings()
-    configure_logging(settings.log_level)
-    logger = structlog.get_logger("alpha.main")
+    configure_global_logging(settings.log_level, force=True)
+    logger = get_logger("alpha.main")
 
     state = StateStore(settings.state_file, ttl=timedelta(hours=settings.state_ttl_hours))
     notifier = SpugNotifier(

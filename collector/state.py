@@ -5,14 +5,14 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict
 
-import structlog
+from alpha_logging import get_logger
 
 
 class StateStore:
     def __init__(self, path: Path, ttl: timedelta):
         self.path = path
         self.ttl = ttl
-        self.logger = structlog.get_logger(__name__)
+        self.logger = get_logger(__name__)
         self._state: Dict[str, str] = {}
         self._load()
 
@@ -21,6 +21,7 @@ class StateStore:
 
     def mark_notified(self, key: str, now: datetime) -> None:
         self._state[key] = now.isoformat()
+        self.logger.info("state.mark_notified", key=key)
         self._persist()
 
     def prune(self, now: datetime) -> None:
@@ -32,6 +33,7 @@ class StateStore:
             if datetime.fromisoformat(value) >= expiry_threshold
         }
         if len(self._state) != original_size:
+            self.logger.info("state.prune", removed=original_size - len(self._state))
             self._persist()
 
     def _load(self) -> None:

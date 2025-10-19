@@ -4,10 +4,9 @@ from dataclasses import dataclass
 from typing import Iterable, Optional
 
 import requests
-import structlog
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
-from collector.models import Event
+from alpha_logging import get_logger
 from collector.reminder import Reminder
 
 
@@ -30,7 +29,7 @@ class SpugConfig:
 class SpugNotifier:
     def __init__(self, config: SpugConfig):
         self.config = config
-        self.logger = structlog.get_logger(__name__)
+        self.logger = get_logger(__name__)
 
     def send(self, reminder: Reminder, quiet_mode: bool = False) -> None:
         channel = self.config.channel
@@ -38,6 +37,13 @@ class SpugNotifier:
             channel = self.config.quiet_channel
 
         title, body = self._build_message(reminder, channel, quiet_mode)
+        self.logger.info(
+            "spug.notify.dispatch",
+            token=reminder.event.token,
+            channel=channel,
+            quiet=quiet_mode,
+            offset=reminder.offset_minutes,
+        )
 
         if self.config.xsend_user_id:
             self._xsend(channel, title, body)

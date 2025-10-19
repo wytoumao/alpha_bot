@@ -112,7 +112,9 @@ def _parse_table_section(table, section_label: str, seen_rows: set[Tuple[str, st
 
     for row in table.find_all("tr"):
         cells = [cell.get_text(" ", strip=True) for cell in row.find_all(["td", "th"])]
-        if not cells or (headers and cells == headers):
+        if not cells:
+            continue
+        if headers and [cell.lower() for cell in cells] == headers:
             continue
         token = _detect_token_from_row(cells, headers)
         if not token:
