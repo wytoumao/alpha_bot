@@ -20,6 +20,7 @@ async def run_once(settings: Settings, notifier: SpugNotifier, state: StateStore
         settings.alpha_url,
         locale=settings.language,
         timezone=settings.timezone,
+        proxy=settings.playwright_proxy,
     )
     now = now_in_timezone(settings.timezone)
 

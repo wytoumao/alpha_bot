@@ -36,6 +36,8 @@ class SettingsModel(BaseModel):
     cron_expression: str = Field(default="*/1 * * * *")
     run_once: bool = Field(default=False)
 
+    playwright_proxy: Optional[str] = None
+
     spug_base_url: str = Field(default="https://push.spug.cc")
     spug_token: Optional[str] = None
     spug_timeout_seconds: int = Field(default=10, ge=1)
@@ -88,6 +90,7 @@ class Settings:
     state_ttl_hours: int
     cron_expression: str
     run_once: bool
+    playwright_proxy: Optional[str]
     spug_base_url: str
     spug_token: Optional[str]
     spug_timeout_seconds: int
@@ -127,6 +130,7 @@ def load_settings() -> Settings:
         state_ttl_hours=model.state_ttl_hours,
         cron_expression=model.cron_expression,
         run_once=model.run_once,
+        playwright_proxy=model.playwright_proxy,
         spug_base_url=model.spug_base_url,
         spug_token=model.spug_token,
         spug_timeout_seconds=model.spug_timeout_seconds,

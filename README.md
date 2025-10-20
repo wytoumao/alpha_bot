@@ -48,6 +48,7 @@ Environment variables (see `config/settings.example.env`):
 | `REMINDER_OFFSETS` | Comma separated offsets (minutes before start). |
 | `QUIET_HOURS` | Quiet window, e.g. `00:00-07:30` to downgrade voice calls. |
 | `STATE_FILE` | Persistent JSON store for dedupe (defaults to `/data/alpha-state.json`). |
+| `PLAYWRIGHT_PROXY` | Optional proxy URI (e.g. `http://127.0.0.1:7891`) for the headless browser. |
 | `SPUG_*` | Base URL, token, channel, template, targets, quiet fallback channel. |
 | `NOTIFY_TBA_ONCE` | Toggle to alert once for TBA events without start time. |
 | `RUN_ONCE` | Force single execution cycle (useful for cron). |
