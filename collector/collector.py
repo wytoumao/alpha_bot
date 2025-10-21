@@ -124,45 +124,46 @@ class AlphaCollector:
             self.logger.debug("collector.response_parse_failed", url=response.url, error=str(exc))
 
     def _deduplicate(self, events: List[Event]) -> List[Event]:
-        unique: dict[tuple[str, str], Event] = {}
+        unique: dict[tuple[str, str, Optional[str], str], Event] = {}
         for event in events:
-            key = (event.section, f"{event.token}|{event.raw_time}")
-            if key not in unique or unique[key].source == "dom":
+            symbol = self._canonical_symbol(event)
+            date = event.details.get("date")
+            raw_time = (event.raw_time or "").lower()
+            key = (event.section, symbol, date, raw_time)
+            if key not in unique:
                 unique[key] = event
+            else:
+                existing = unique[key]
+                if existing.source == "dom" and event.source == "json":
+                    merged = {**event.details, **existing.details}
+                    event.details = merged
+                    unique[key] = event
+                elif existing.source == "json" and event.source == "dom":
+                    existing.details.update(event.details)
         return list(unique.values())
 
     def _enrich_and_filter(self, events: List[Event], now: datetime) -> List[Event]:
-        today_str = now.strftime("%Y-%m-%d")
         filtered: List[Event] = []
         tool_drops = 0
-        non_today_drops = 0
 
         for event in events:
-            if isinstance(event.details, dict):
-                date_value = event.details.get("date") or event.details.get("Date")
-                if date_value:
-                    date_str = str(date_value).strip()
-                    if date_str:
-                        event.details["date"] = date_str
-                        event.section = "today" if date_str == today_str else "upcoming"
+            display_name = event.details.get("display_name") or event.token
+            symbol = self._canonical_symbol(event)
+            event.details["display_name"] = display_name
+            event.details["section"] = event.section
+            event.token = symbol
 
             if self._is_tool_card(event):
                 self.logger.debug("collector.filter.tool_card", token=event.token)
                 tool_drops += 1
                 continue
 
-            if event.section != "today":
-                non_today_drops += 1
-                continue
-
             filtered.append(event)
 
         self.logger.info(
             "collector.filter.summary",
-            today=today_str,
             kept=len(filtered),
             tool_drops=tool_drops,
-            non_today_drops=non_today_drops,
         )
         return filtered
 
@@ -178,6 +179,19 @@ class AlphaCollector:
             if isinstance(lines, list) and any(isinstance(item, str) and any(keyword in item for keyword in TOOL_SUBSTRINGS) for item in lines):
                 return True
         return False
+
+    def _canonical_symbol(self, event: Event) -> str:
+        details = event.details or {}
+        symbol = (
+            details.get("symbol")
+            or details.get("token")
+            or details.get("symbol_name")
+            or (event.token or "")
+        )
+        symbol = str(symbol).strip()
+        if " " in symbol:
+            symbol = symbol.split()[0]
+        return symbol.upper()
 
     def _build_proxy_config(self, proxy_value: str) -> Dict[str, Any]:
         parsed = urlparse(proxy_value)

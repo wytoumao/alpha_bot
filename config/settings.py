@@ -33,6 +33,14 @@ class SettingsModel(BaseModel):
     state_file: Path = Field(default=Path("./state/alpha-state.json"))
     state_ttl_hours: int = Field(default=48)
 
+    db_host: str = Field(default="127.0.0.1")
+    db_port: int = Field(default=3306)
+    db_user: str = Field(default="alpha")
+    db_password: str = Field(default="")
+    db_name: str = Field(default="alpha_bot")
+    db_pool_minsize: int = Field(default=1, ge=1)
+    db_pool_maxsize: int = Field(default=5, ge=1)
+
     cron_expression: str = Field(default="*/1 * * * *")
     run_once: bool = Field(default=False)
 
@@ -88,6 +96,13 @@ class Settings:
     quiet_hours: Optional[Tuple[time, time]]
     state_file: Path
     state_ttl_hours: int
+    db_host: str
+    db_port: int
+    db_user: str
+    db_password: str
+    db_name: str
+    db_pool_minsize: int
+    db_pool_maxsize: int
     cron_expression: str
     run_once: bool
     playwright_proxy: Optional[str]
@@ -128,6 +143,13 @@ def load_settings() -> Settings:
         quiet_hours=quiet_window,
         state_file=model.state_file,
         state_ttl_hours=model.state_ttl_hours,
+        db_host=model.db_host,
+        db_port=model.db_port,
+        db_user=model.db_user,
+        db_password=model.db_password,
+        db_name=model.db_name,
+        db_pool_minsize=model.db_pool_minsize,
+        db_pool_maxsize=model.db_pool_maxsize,
         cron_expression=model.cron_expression,
         run_once=model.run_once,
         playwright_proxy=model.playwright_proxy,

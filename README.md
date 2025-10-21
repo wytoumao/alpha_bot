@@ -58,8 +58,8 @@ Environment variables (see `config/settings.example.env`):
 - **systemd timer**: create a unit calling the virtualenv python binary every minute.
 - **Docker Compose**: populate an `.env` file with variables above and run `docker compose -f deploy/docker-compose.yaml up -d`.
 
-## Logging & State
-Logs are JSON structured on stdout (include collector status, reminder counts, notification responses). State file keeps reminder keys (`{section}|{token}|{time}|offset`) with TTL (48h default) to prevent repeat notifications.
+## Logging & Persistence
+Logs are JSON structured on stdout (collector status, reminder counts, notification results). Scraped events and pending notifications are persisted in MySQL (see `deploy/schema.sql`) so collectors and notifiers can run independently.
 
 ## Tests
 Offline unit tests cover JSON/DOM parsing, reminder evaluation, and time utilities.
@@ -71,8 +71,9 @@ pytest
 Fixtures in `tests/fixtures/` provide deterministic HTML/JSON snapshots for regression testing.
 
 ## Deployment Checklist
-1. Configure `.env` or environment variables (Spug token, user/channel/template, reminder offsets).
-2. Run `deploy/bootstrap.sh` (or replicate steps) to install dependencies and Playwright browser.
-3. Verify a dry-run locally with `RUN_ONCE=true python -m collector.alpha_watch`.
-4. Enable scheduler via cron/systemd or build with the provided Dockerfile/Compose stack.
-5. Monitor logs and adjust reminder offsets, quiet hours, or Spug channels as needed.
+1. Configure `.env` or environment variables (MySQL credentials, Spug token/channel/template, reminder offsets).
+2. Apply `deploy/schema.sql` to the target MySQL database.
+3. Run `deploy/bootstrap.sh` (or replicate steps) to install dependencies and Playwright browser.
+4. Verify a dry-run locally with `RUN_ONCE=true python -m collector.alpha_watch`.
+5. Enable scheduler via cron/systemd or build with the provided Dockerfile/Compose stack.
+6. Monitor logs and adjust reminder offsets, quiet hours, or Spug channels as needed.
