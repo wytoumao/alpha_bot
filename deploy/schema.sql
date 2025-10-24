@@ -2,16 +2,14 @@
 
 CREATE TABLE IF NOT EXISTS alpha_events (
     id BIGINT UNSIGNED AUTO_INCREMENT COMMENT 'Primary key' PRIMARY KEY,
+    created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Record creation timestamp',
+    updated DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Record update timestamp',
     token VARCHAR(64) NOT NULL COMMENT 'Token symbol or project identifier',
-    start_time DATETIME NULL COMMENT 'Parsed local start time (Asia/Taipei)',
-    raw_time VARCHAR(64) NULL COMMENT 'Raw time string extracted from source',
     amount VARCHAR(128) NULL COMMENT 'Parsed amount or allocation info',
     points VARCHAR(64) NULL COMMENT 'Parsed points/score requirement',
-    project VARCHAR(128) NULL COMMENT 'Parsed project/display name',
+    start_time DATETIME NULL COMMENT 'Parsed local start time (Asia/Taipei)',
+    raw_time VARCHAR(64) NULL COMMENT 'Raw time string extracted from source',
     details_json JSON NOT NULL COMMENT 'Full detail payload as JSON',
-    source ENUM('json','dom','db') NOT NULL COMMENT 'Original data origin',
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Record creation timestamp',
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Record update timestamp',
     UNIQUE KEY uk_event_token_raw_time (token, raw_time),
     KEY idx_start_time (start_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Scraped Alpha listing/airdrop events';

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from time import time as current_timestamp
 from typing import Iterable, List, Optional
-import re
 
 from alpha_logging import get_logger
 from collector.models import Event
@@ -45,7 +46,7 @@ class Repository:
         return symbol.upper()
 
     @staticmethod
-    def _extract_detail_fields(details: dict) -> tuple[Optional[str], Optional[str], Optional[str]]:
+    def _extract_detail_fields(details: dict) -> tuple[Optional[str], Optional[str]]:
         def pick(keys: Iterable[str]) -> Optional[str]:
             for key in keys:
                 if key in details and details[key] not in (None, ""):
@@ -60,8 +61,7 @@ class Repository:
 
         amount = pick(["amount", "数量", "allocation", "supply"])
         points = pick(["points", "积分", "score"])
-        project = pick(["project", "项目", "display_name", "name"])
-        return amount, points, project
+        return amount, points
 
     @staticmethod
     def _is_valid_time_format(raw_time: Optional[str]) -> bool:
@@ -81,7 +81,7 @@ class Repository:
             if not self._is_valid_time_format(event.raw_time):
                 continue
             start_time_str = event.start_time.strftime("%Y-%m-%d %H:%M:%S") if event.start_time else None
-            amount_value, points_value, project_value = self._extract_detail_fields(event.details)
+            amount_value, points_value = self._extract_detail_fields(event.details)
             details_json = json.dumps(event.details, ensure_ascii=False)
             row = await self.db.fetchone(
                 """
@@ -98,9 +98,7 @@ class Repository:
                         raw_time=%s,
                         amount=%s,
                         points=%s,
-                        project=%s,
                         details_json=%s,
-                        source=%s
                     WHERE id=%s
                     """,
                     (
@@ -108,9 +106,7 @@ class Repository:
                         event.raw_time,
                         amount_value,
                         points_value,
-                        project_value,
                         details_json,
-                        event.source,
                         event_id,
                     ),
                 )
@@ -118,8 +114,8 @@ class Repository:
                 await self.db.execute(
                     """
                     INSERT INTO alpha_events
-                        (token, start_time, raw_time, amount, points, project, details_json, source)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        (token, start_time, raw_time, amount, points, details_json)
+                    VALUES (%s, %s, %s, %s, %s, %s)
                     """,
                     (
                         event.token,
@@ -127,9 +123,7 @@ class Repository:
                         event.raw_time,
                         amount_value,
                         points_value,
-                        project_value,
                         details_json,
-                        event.source,
                     ),
                 )
                 row = await self.db.fetchone(
@@ -150,25 +144,22 @@ class Repository:
         default_channel: str,
         now: datetime,
     ) -> None:
+        del reminder_offsets  # unused under new single-notification policy
+        current_ts = current_timestamp()
         for event_id, event in zip(event_ids, events):
             if not event.start_time:
-                await self._create_notification_task(
-                    event_id=event_id,
-                    event=event,
-                    offset=None,
-                    remind_at=now,
-                    channel=default_channel,
-                )
                 continue
-            for offset in reminder_offsets:
-                remind_at = event.start_time - timedelta(minutes=offset)
-                await self._create_notification_task(
-                    event_id=event_id,
-                    event=event,
-                    offset=offset,
-                    remind_at=remind_at,
-                    channel=default_channel,
-                )
+            start_ts = event.start_time.timestamp()
+            if current_ts - 30 * 60 >= start_ts:
+                continue
+            remind_at = event.start_time - timedelta(minutes=30)
+            await self._create_notification_task(
+                event_id=event_id,
+                event=event,
+                offset=30,
+                remind_at=remind_at,
+                channel=default_channel,
+            )
 
     async def _create_notification_task(
         self,

@@ -60,26 +60,25 @@ class SpugNotifier:
 
     def _build_message(self, reminder: Reminder, channel: str, quiet_mode: bool) -> tuple[str, str]:
         event = reminder.event
-        offset = reminder.offset_minutes
-        prefix = f"{event.token}"
+        title = f"[Alpha 提醒] {event.token}"
+
         if event.start_time:
-            prefix = f"{event.token} {event.start_time.strftime('%Y-%m-%d %H:%M')}"
-        title = f"[Alpha] {prefix}"
+            time_line = f"开盘时间：{event.start_time.strftime('%Y-%m-%d %H:%M')}"
+        else:
+            time_line = f"原始时间：{event.raw_time or '待定'}"
+
+        points = (
+            event.details.get("points")
+            or event.details.get("积分")
+            or "未知"
+        )
 
         lines = [
-            f"Section: {event.section}",
+            time_line,
+            f"项目：{event.token}",
+            f"积分：{points}",
+            "请及时关注最新公告。",
         ]
-        if event.start_time:
-            lines.append(f"Start: {event.start_time.strftime('%Y-%m-%d %H:%M %Z')}")
-        else:
-            lines.append(f"Time: {event.raw_time or 'TBA'}")
-        if offset is not None:
-            lines.append(f"Reminder: T-{offset} min")
-        if quiet_mode:
-            lines.append("Quiet hours fallback channel")
-        for key, value in event.details.items():
-            if isinstance(value, (str, int, float)):
-                lines.append(f"{key}: {value}")
 
         body = "\n".join(lines)
         return title, body
