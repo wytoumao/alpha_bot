@@ -145,8 +145,7 @@ async def main() -> None:
             channel=settings.spug_channel,
             quiet_channel=settings.spug_quiet_channel,
             xsend_user_id=settings.spug_xsend_user_id,
-            template_id=settings.spug_template_id,
-            targets=settings.spug_targets,
+            proxy=settings.spug_proxy,
         )
     )
 

@@ -50,12 +50,10 @@ class SettingsModel(BaseModel):
     spug_token: Optional[str] = None
     spug_timeout_seconds: int = Field(default=10, ge=1)
     spug_quiet_channel: Optional[str] = None
+    spug_proxy: Optional[str] = None
 
     spug_xsend_user_id: Optional[str] = None
     spug_channel: str = Field(default="voice")
-
-    spug_template_id: Optional[str] = None
-    spug_targets: List[str] = Field(default_factory=list)
 
     log_level: str = Field(default="INFO")
     notify_tba_once: bool = Field(default=True)
@@ -70,14 +68,6 @@ class SettingsModel(BaseModel):
         if isinstance(value, str):
             return [int(part.strip()) for part in value.split(",") if part.strip()]
         raise ValueError("reminder_offsets must be list or comma-separated string")
-
-    @validator("spug_targets", pre=True)
-    def _parse_targets(cls, value):
-        if value is None:
-            return []
-        if isinstance(value, list):
-            return [item.strip() for item in value if item]
-        return [item.strip() for item in str(value).split(",") if item.strip()]
 
     @validator("state_file", pre=True)
     def _parse_state_file(cls, value):
@@ -110,10 +100,9 @@ class Settings:
     spug_token: Optional[str]
     spug_timeout_seconds: int
     spug_quiet_channel: Optional[str]
+    spug_proxy: Optional[str]
     spug_xsend_user_id: Optional[str]
     spug_channel: str
-    spug_template_id: Optional[str]
-    spug_targets: List[str]
     log_level: str
     notify_tba_once: bool
 
@@ -157,10 +146,9 @@ def load_settings() -> Settings:
         spug_token=model.spug_token,
         spug_timeout_seconds=model.spug_timeout_seconds,
         spug_quiet_channel=model.spug_quiet_channel,
+        spug_proxy=model.spug_proxy,
         spug_xsend_user_id=model.spug_xsend_user_id,
         spug_channel=model.spug_channel,
-        spug_template_id=model.spug_template_id,
-        spug_targets=model.spug_targets,
         log_level=model.log_level.upper(),
         notify_tba_once=model.notify_tba_once,
     )

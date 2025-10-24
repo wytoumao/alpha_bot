@@ -4,6 +4,7 @@ import json
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Iterable, List, Optional
+import re
 
 from alpha_logging import get_logger
 from collector.models import Event
@@ -43,6 +44,31 @@ class Repository:
             symbol = symbol.split()[0]
         return symbol.upper()
 
+    @staticmethod
+    def _extract_detail_fields(details: dict) -> tuple[Optional[str], Optional[str], Optional[str]]:
+        def pick(keys: Iterable[str]) -> Optional[str]:
+            for key in keys:
+                if key in details and details[key] not in (None, ""):
+                    value = details[key]
+                    if isinstance(value, str):
+                        candidate = value.strip()
+                    else:
+                        candidate = str(value)
+                    if candidate:
+                        return candidate
+            return None
+
+        amount = pick(["amount", "数量", "allocation", "supply"])
+        points = pick(["points", "积分", "score"])
+        project = pick(["project", "项目", "display_name", "name"])
+        return amount, points, project
+
+    @staticmethod
+    def _is_valid_time_format(raw_time: Optional[str]) -> bool:
+        if not raw_time:
+            return False
+        return bool(re.search(r"\b\d{1,2}:\d{2}\b", raw_time))
+
     async def upsert_events(self, events: Iterable[Event], now: datetime) -> List[int]:
         event_ids: List[int] = []
         for event in events:
@@ -52,15 +78,16 @@ class Repository:
             if dval is not None and str(dval) != today_str:
                 # Skip non-today events to keep DB clean
                 continue
+            if not self._is_valid_time_format(event.raw_time):
+                continue
             start_time_str = event.start_time.strftime("%Y-%m-%d %H:%M:%S") if event.start_time else None
+            amount_value, points_value, project_value = self._extract_detail_fields(event.details)
             details_json = json.dumps(event.details, ensure_ascii=False)
             row = await self.db.fetchone(
                 """
-                SELECT id FROM alpha_events WHERE token=%s AND (
-                    (start_time IS NULL AND %s IS NULL) OR start_time = %s
-                )
+                SELECT id FROM alpha_events WHERE token=%s AND raw_time=%s
                 """,
-                (event.token, start_time_str, start_time_str),
+                (event.token, event.raw_time),
             )
             if row:
                 event_id = row["id"]
@@ -69,6 +96,9 @@ class Repository:
                     UPDATE alpha_events
                     SET start_time=%s,
                         raw_time=%s,
+                        amount=%s,
+                        points=%s,
+                        project=%s,
                         details_json=%s,
                         source=%s
                     WHERE id=%s
@@ -76,6 +106,9 @@ class Repository:
                     (
                         start_time_str,
                         event.raw_time,
+                        amount_value,
+                        points_value,
+                        project_value,
                         details_json,
                         event.source,
                         event_id,
@@ -85,24 +118,25 @@ class Repository:
                 await self.db.execute(
                     """
                     INSERT INTO alpha_events
-                        (token, start_time, raw_time, details_json, source)
-                    VALUES (%s, %s, %s, %s, %s)
+                        (token, start_time, raw_time, amount, points, project, details_json, source)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     (
                         event.token,
                         start_time_str,
                         event.raw_time,
+                        amount_value,
+                        points_value,
+                        project_value,
                         details_json,
                         event.source,
                     ),
                 )
                 row = await self.db.fetchone(
                     """
-                    SELECT id FROM alpha_events WHERE token=%s AND (
-                        (start_time IS NULL AND %s IS NULL) OR start_time = %s
-                    )
+                    SELECT id FROM alpha_events WHERE token=%s AND raw_time=%s
                     """,
-                    (event.token, start_time_str, start_time_str),
+                    (event.token, event.raw_time),
                 )
                 event_id = row["id"]
             event_ids.append(event_id)
@@ -207,6 +241,7 @@ class Repository:
 
     async def mark_notification_sent(self, notification_id: int, success: bool, fail_reason: Optional[str] = None) -> None:
         status = "sent" if success else "failed"
+        reason = fail_reason[:255] if fail_reason else None
         await self.db.execute(
             """
             UPDATE alpha_notifications
@@ -216,7 +251,7 @@ class Repository:
                 attempts=attempts+1
             WHERE id=%s
             """,
-            (status, status, fail_reason, notification_id),
+            (status, status, reason, notification_id),
         )
 
     async def log_notification_attempt(

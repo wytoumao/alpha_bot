@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, Optional
+from typing import Optional
 
 import requests
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
@@ -22,8 +22,8 @@ class SpugConfig:
     channel: str
     quiet_channel: Optional[str]
     xsend_user_id: Optional[str]
-    template_id: Optional[str]
-    targets: Iterable[str]
+    proxy: Optional[str]
+
 
 
 @dataclass
@@ -53,11 +53,10 @@ class SpugNotifier:
             offset=reminder.offset_minutes,
         )
 
-        if self.config.xsend_user_id:
-            return self._xsend(channel, title, body)
-        if self.config.template_id and self.config.targets:
-            return self._template_send(title, body)
-        raise SpugError("Spug configuration incomplete. Provide xsend user id or template id with targets.")
+        if not self.config.xsend_user_id:
+            raise SpugError("Spug configuration incomplete. Provide SPUG_XSEND_USER_ID.")
+
+        return self._xsend(channel, title, body)
 
     def _build_message(self, reminder: Reminder, channel: str, quiet_mode: bool) -> tuple[str, str]:
         event = reminder.event
@@ -93,56 +92,41 @@ class SpugNotifier:
     )
     def _xsend(self, channel: str, title: str, body: str) -> NotificationResult:
         url = f"{self.config.base_url.rstrip('/')}/xsend/{self.config.xsend_user_id}"
-        payload = {
+        params = {
             "title": title,
             "content": body,
-            "channel": channel,
         }
-        response = self._post(url, payload)
+        if channel:
+            params["channel"] = channel
+
+        response = self._request(url, params)
         if response.status_code >= 300:
             raise SpugError(f"xsend failed: {response.status_code} {response.text}")
         self.logger.info("spug.xsend.success", channel=channel)
         return NotificationResult(
             endpoint="/xsend",
-            payload=payload,
+            payload=dict(params),
             status_code=response.status_code,
             response_body=_safe_json(response),
         )
 
-    @retry(
-        reraise=True,
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=1, max=8),
-        retry=retry_if_exception_type(SpugError),
-    )
-    def _template_send(self, title: str, body: str) -> NotificationResult:
-        url = f"{self.config.base_url.rstrip('/')}/send/{self.config.template_id}"
-        payload = {
-            "targets": list(self.config.targets),
-            "title": title,
-            "content": body,
-        }
-        response = self._post(url, payload)
-        if response.status_code >= 300:
-            raise SpugError(f"template send failed: {response.status_code} {response.text}")
-        self.logger.info("spug.template.success", targets=len(self.config.targets))
-        return NotificationResult(
-            endpoint="/send",
-            payload=payload,
-            status_code=response.status_code,
-            response_body=_safe_json(response),
-        )
-
-    def _post(self, url: str, payload: dict) -> requests.Response:
-        headers = {"Content-Type": "application/json"}
+    def _request(self, url: str, params: dict) -> requests.Response:
+        headers = {}
         if self.config.token:
             headers["Authorization"] = f"Token {self.config.token}"
+        proxies = None
+        if self.config.proxy:
+            proxies = {
+                "http": self.config.proxy,
+                "https": self.config.proxy,
+            }
         try:
-            response = requests.post(
+            response = requests.get(
                 url,
-                json=payload,
+                params=params,
                 headers=headers,
                 timeout=self.config.timeout_seconds,
+                proxies=proxies,
             )
             return response
         except requests.RequestException as exc:

@@ -192,7 +192,9 @@ def _detect_token_from_row(cells: List[str], headers: List[str]) -> Optional[str
     if headers:
         for idx, header in enumerate(headers):
             if any(token_key in header for token_key in ["token", "coin", "项目", "name", "symbol"]):
-                return cells[idx].strip()
+                if idx < len(cells):
+                    return cells[idx].strip()
+                break
     return cells[0].strip() if cells else None
 
 
@@ -200,7 +202,9 @@ def _detect_time_from_row(cells: List[str], headers: List[str]) -> Optional[str]
     if headers:
         for idx, header in enumerate(headers):
             if any(time_key in header for time_key in ["time", "时间", "时刻", "开始"]):
-                return cells[idx].strip()
+                if idx < len(cells):
+                    return cells[idx].strip()
+                break
     for cell in cells:
         if _looks_like_time(cell):
             return cell.strip()

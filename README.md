@@ -7,7 +7,7 @@ Playwright-based watcher for [alpha123.uk](https://alpha123.uk) that captures da
 - Robust parsing across English and Chinese table layouts.
 - Configurable reminder offsets, quiet hours, notification channels, and TBA handling.
 - Idempotent state tracking with TTL to avoid duplicate alerts.
-- Spug notifier supporting both `/xsend/<user_id>` and `/send/<template_id>` flows with automatic retries.
+- Spug notifier using `/xsend/<user_id>` quick mode with automatic retries.
 - Structured logging (JSON via `structlog`) for observability.
 
 ## Project Layout
@@ -49,7 +49,7 @@ Environment variables (see `config/settings.example.env`):
 | `QUIET_HOURS` | Quiet window, e.g. `00:00-07:30` to downgrade voice calls. |
 | `STATE_FILE` | Persistent JSON store for dedupe (defaults to `/data/alpha-state.json`). |
 | `PLAYWRIGHT_PROXY` | Optional proxy URI (e.g. `http://127.0.0.1:7891`) for the headless browser. |
-| `SPUG_*` | Base URL, token, channel, template, targets, quiet fallback channel. |
+| `SPUG_*` | Base URL, optional token/proxy, xsend user id, channel, quiet fallback channel. |
 | `NOTIFY_TBA_ONCE` | Toggle to alert once for TBA events without start time. |
 | `RUN_ONCE` | Force single execution cycle (useful for cron). |
 
@@ -71,7 +71,7 @@ pytest
 Fixtures in `tests/fixtures/` provide deterministic HTML/JSON snapshots for regression testing.
 
 ## Deployment Checklist
-1. Configure `.env` or environment variables (MySQL credentials, Spug token/channel/template, reminder offsets).
+1. Configure `.env` or environment variables (MySQL credentials, Spug user id/token/channel, reminder offsets).
 2. Apply `deploy/schema.sql` to the target MySQL database.
 3. Run `deploy/bootstrap.sh` (or replicate steps) to install dependencies and Playwright browser.
 4. Verify a dry-run locally with `RUN_ONCE=true python -m collector.alpha_watch`.

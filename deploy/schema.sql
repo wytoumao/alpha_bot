@@ -5,11 +5,14 @@ CREATE TABLE IF NOT EXISTS alpha_events (
     token VARCHAR(64) NOT NULL COMMENT 'Token symbol or project identifier',
     start_time DATETIME NULL COMMENT 'Parsed local start time (Asia/Taipei)',
     raw_time VARCHAR(64) NULL COMMENT 'Raw time string extracted from source',
+    amount VARCHAR(128) NULL COMMENT 'Parsed amount or allocation info',
+    points VARCHAR(64) NULL COMMENT 'Parsed points/score requirement',
+    project VARCHAR(128) NULL COMMENT 'Parsed project/display name',
     details_json JSON NOT NULL COMMENT 'Full detail payload as JSON',
     source ENUM('json','dom','db') NOT NULL COMMENT 'Original data origin',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Record creation timestamp',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Record update timestamp',
-    UNIQUE KEY uk_event_token_time (token, start_time),
+    UNIQUE KEY uk_event_token_raw_time (token, raw_time),
     KEY idx_start_time (start_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Scraped Alpha listing/airdrop events';
 
@@ -23,7 +26,7 @@ CREATE TABLE IF NOT EXISTS alpha_notifications (
     sent_at DATETIME NULL COMMENT 'Actual send timestamp',
     fail_reason VARCHAR(255) NULL COMMENT 'Reason for failure, if any',
     attempts TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Number of attempts performed',
-    metadata JSON NULL COMMENT 'Additional metadata (quiet-mode, template, etc.)',
+    metadata JSON NULL COMMENT 'Additional metadata (quiet-mode overrides, retry context, etc.)',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Creation timestamp',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Update timestamp',
     UNIQUE KEY uk_event_offset (event_id, offset_minutes, channel),
