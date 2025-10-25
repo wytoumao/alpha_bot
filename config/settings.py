@@ -4,7 +4,7 @@ import os
 from dataclasses import dataclass
 from datetime import time
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field, validator
@@ -27,7 +27,6 @@ class SettingsModel(BaseModel):
     language: str = Field(default="zh")
     timezone: str = Field(default="Asia/Taipei")
     ahead_minutes: int = Field(default=30, ge=1)
-    reminder_offsets: List[int] = Field(default_factory=lambda: [30, 5])
     quiet_hours: Optional[str] = None
 
     state_file: Path = Field(default=Path("./state/alpha-state.json"))
@@ -61,14 +60,6 @@ class SettingsModel(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-    @validator("reminder_offsets", pre=True)
-    def _parse_offsets(cls, value):
-        if isinstance(value, list):
-            return [int(v) for v in value]
-        if isinstance(value, str):
-            return [int(part.strip()) for part in value.split(",") if part.strip()]
-        raise ValueError("reminder_offsets must be list or comma-separated string")
-
     @validator("state_file", pre=True)
     def _parse_state_file(cls, value):
         if isinstance(value, Path):
@@ -82,7 +73,6 @@ class Settings:
     language: str
     timezone: str
     ahead_minutes: int
-    reminder_offsets: List[int]
     quiet_hours: Optional[Tuple[time, time]]
     state_file: Path
     state_ttl_hours: int
@@ -128,7 +118,6 @@ def load_settings() -> Settings:
         language=model.language,
         timezone=model.timezone,
         ahead_minutes=model.ahead_minutes,
-        reminder_offsets=model.reminder_offsets,
         quiet_hours=quiet_window,
         state_file=model.state_file,
         state_ttl_hours=model.state_ttl_hours,

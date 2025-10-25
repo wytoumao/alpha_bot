@@ -5,16 +5,18 @@ Playwright-based watcher for [alpha123.uk](https://alpha123.uk) that captures da
 ## Features
 - Headless Chromium collection with network interception first, DOM fallback second.
 - Robust parsing across English and Chinese table layouts.
-- Configurable reminder offsets, quiet hours, notification channels, and TBA handling.
+- Configurable quiet hours, notification channels, and TBA handling.
 - Idempotent state tracking with TTL to avoid duplicate alerts.
+- Separate ingest + dispatcher workers so scraping hiccups do not block notifications.
+- Default reminder window of T-30 minutes for events with confirmed start times.
 - Spug notifier using `/xsend/<user_id>` quick mode with automatic retries.
 - Structured logging (JSON via `structlog`) for observability.
 
 ## Project Layout
 ```
-collector/           # Playwright entry script, parsing, state, reminder engine
+collector/           # Playwright entry script, parsing, ingest worker
 config/              # Environment settings loader
-notifier/            # Spug integration
+notifier/            # Spug integration + dispatcher loop
 deploy/              # Dockerfile, docker-compose, bootstrap script, cron sample
 tests/               # Offline fixtures and unit tests
 ```
@@ -30,12 +32,15 @@ git clone https://github.com/wytoumao/alpha_bot.git
 cd alpha_bot
 bash deploy/bootstrap.sh        # create .venv, install deps, install Playwright browser
 cp config/settings.example.env .env
-# edit .env with your Spug credentials and reminder preferences
+# edit .env with your DB/Spug credentials and reminder preferences
 source .venv/bin/activate
+# Terminal 1: ingest site data and populate alpha_events / alpha_notifications
 python -m collector.alpha_watch
+# Terminal 2: poll pending notifications and send via Spug
+python -m notifier.dispatch
 ```
 
-The watcher will continue running every minute unless `RUN_ONCE=true` is set. Cron/systemd usage is still recommended for production.
+Each worker loops every minute unless `RUN_ONCE=true` is set. For unattended operation schedule **both** commands via cron/systemd/container.
 
 ## Configuration
 Environment variables (see `config/settings.example.env`):
@@ -45,7 +50,6 @@ Environment variables (see `config/settings.example.env`):
 | `ALPHA_URL` | Target site (supports `/zh` or default). |
 | `TIMEZONE` | Olson timezone, e.g. `Asia/Taipei`. |
 | `AHEAD_MINUTES` | Maximum look-ahead window for reminders. |
-| `REMINDER_OFFSETS` | Comma separated offsets (minutes before start). |
 | `QUIET_HOURS` | Quiet window, e.g. `00:00-07:30` to downgrade voice calls. |
 | `STATE_FILE` | Persistent JSON store for dedupe (defaults to `/data/alpha-state.json`). |
 | `PLAYWRIGHT_PROXY` | Optional proxy URI (e.g. `http://127.0.0.1:7891`) for the headless browser. |
@@ -54,9 +58,8 @@ Environment variables (see `config/settings.example.env`):
 | `RUN_ONCE` | Force single execution cycle (useful for cron). |
 
 ## Scheduling Options
-- **Cron**: adapt `deploy/cron.example` to your installation path and append to crontab (`crontab -e`).
-- **systemd timer**: create a unit calling the virtualenv python binary every minute.
-- **Docker Compose**: populate an `.env` file with variables above and run `docker compose -f deploy/docker-compose.yaml up -d`.
+- **Cron/systemd**: create two jobs — one for `python -m collector.alpha_watch`, another for `python -m notifier.dispatch`.
+- **Docker Compose**: populate an `.env` file with variables above and run `docker compose -f deploy/docker-compose.yaml up -d` (spins up ingest + dispatch services).
 
 ## Logging & Persistence
 Logs are JSON structured on stdout (collector status, reminder counts, notification results). Scraped events and pending notifications are persisted in MySQL (see `deploy/schema.sql`) so collectors and notifiers can run independently.
@@ -71,9 +74,11 @@ pytest
 Fixtures in `tests/fixtures/` provide deterministic HTML/JSON snapshots for regression testing.
 
 ## Deployment Checklist
-1. Configure `.env` or environment variables (MySQL credentials, Spug user id/token/channel, reminder offsets).
+1. Configure `.env` or environment variables (MySQL credentials, Spug user id/token/channel).
 2. Apply `deploy/schema.sql` to the target MySQL database.
 3. Run `deploy/bootstrap.sh` (or replicate steps) to install dependencies and Playwright browser.
-4. Verify a dry-run locally with `RUN_ONCE=true python -m collector.alpha_watch`.
-5. Enable scheduler via cron/systemd or build with the provided Dockerfile/Compose stack.
-6. Monitor logs and adjust reminder offsets, quiet hours, or Spug channels as needed.
+4. Verify dry-runs locally:
+   - `RUN_ONCE=true python -m collector.alpha_watch`
+   - `RUN_ONCE=true python -m notifier.dispatch`
+5. Enable schedulers (cron/systemd/Compose) for both workers.
+6. Monitor logs and adjust quiet hours or Spug channels as needed.

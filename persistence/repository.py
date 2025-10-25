@@ -140,11 +140,9 @@ class Repository:
         self,
         event_ids: List[int],
         events: List[Event],
-        reminder_offsets: List[int],
         default_channel: str,
         now: datetime,
     ) -> None:
-        del reminder_offsets  # unused under new single-notification policy
         current_ts = current_timestamp()
         for event_id, event in zip(event_ids, events):
             if not event.start_time:
