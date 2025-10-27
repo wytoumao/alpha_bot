@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 
 from alpha_logging import configure as configure_global_logging, get_logger
+from pathlib import Path
 from collector.models import Event
 from collector.reminder import Reminder
 from collector.timeutil import in_quiet_hours, now_in_timezone
@@ -11,6 +12,8 @@ from notifier.spug import NotificationResult, SpugConfig, SpugNotifier, SpugErro
 from persistence.database import Database
 from persistence.repository import NotificationTask, Repository
 from datetime import timedelta
+
+SCHEMA_PATH = Path(__file__).resolve().parent.parent / "deploy" / "schema.sql"
 
 
 async def dispatch_once(settings: Settings, notifier: SpugNotifier, repository: Repository) -> None:
@@ -107,6 +110,7 @@ async def main() -> None:
         maxsize=settings.db_pool_maxsize,
     )
     await database.connect()
+    await database.ensure_schema(SCHEMA_PATH)
     repository = Repository(database)
     notifier = SpugNotifier(
         SpugConfig(

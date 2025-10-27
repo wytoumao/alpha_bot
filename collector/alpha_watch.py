@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from alpha_logging import configure as configure_global_logging, get_logger
+from pathlib import Path
 
 from config.settings import Settings, load_settings
 from persistence.database import Database
@@ -10,6 +11,8 @@ from persistence.repository import Repository
 from .collector import AlphaCollector
 from .models import Event
 from .timeutil import now_in_timezone, parse_event_time
+
+SCHEMA_PATH = Path(__file__).resolve().parent.parent / "deploy" / "schema.sql"
 
 
 async def ingest_once(settings: Settings, repository: Repository) -> None:
@@ -76,6 +79,7 @@ async def main() -> None:
         maxsize=settings.db_pool_maxsize,
     )
     await database.connect()
+    await database.ensure_schema(SCHEMA_PATH)
     repository = Repository(database)
 
     try:

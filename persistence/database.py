@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any, AsyncIterator, Optional
 
 import aiomysql
@@ -34,6 +35,7 @@ class Database:
         }
         self.logger = get_logger(__name__)
         self._lock = asyncio.Lock()
+        self._schema_initialized = False
 
     async def connect(self) -> None:
         if self._pool:
@@ -88,3 +90,39 @@ class Database:
         async with self.cursor() as cur:
             await cur.execute(query, params)
             return await cur.fetchone()
+
+    async def ensure_schema(self, schema_path: Path) -> None:
+        if self._schema_initialized:
+            return
+        schema_path = schema_path.resolve()
+        if not schema_path.exists():
+            raise FileNotFoundError(f"Schema file not found: {schema_path}")
+
+        content = schema_path.read_text(encoding="utf-8")
+        statements: list[str] = []
+        buffer: list[str] = []
+        for line in content.splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("--"):
+                continue
+            buffer.append(line)
+            if stripped.endswith(";"):
+                statement = "\n".join(buffer).rstrip(";").strip()
+                if statement:
+                    statements.append(statement)
+                buffer = []
+        if buffer:
+            statement = "\n".join(buffer).strip()
+            if statement:
+                statements.append(statement)
+
+        if not statements:
+            self.logger.warning("db.schema.empty", path=str(schema_path))
+            self._schema_initialized = True
+            return
+
+        async with self.cursor() as cur:
+            for statement in statements:
+                await cur.execute(statement)
+        self.logger.info("db.schema.applied", path=str(schema_path), statements=len(statements))
+        self._schema_initialized = True
